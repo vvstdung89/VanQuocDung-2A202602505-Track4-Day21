@@ -47,7 +47,12 @@ Use-case cụ thể (ADAS / robot / drone), trade-off và bước tiếp theo.
 Các lệnh tái tạo lại toàn bộ kết quả từ repo sạch.
 
 ```bash
-[ĐIỀN]
+# CP2: overlay calib gốc trên 3 dataset (dùng 2 hàm TODO trong starter/projection.py)
+python -m starter.projection --data-root data/synthetic --frame 000000
+python -m starter.projection --data-root data/kitti_mini --frame 000011
+python -m starter.projection --data-root data/nuscenes_mini_subset --frame scene-0103_010
+# CP2: ảnh 3 khoảng cách + ảnh so sánh yaw 0°/1°/3°
+python -m src.demo_overlays
 ```
 
 ## 6. Khai báo sử dụng AI
