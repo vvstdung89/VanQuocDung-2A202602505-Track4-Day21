@@ -1,4 +1,4 @@
-# Báo cáo Day 6: [ĐIỀN tên đề tài ngắn]
+# Báo cáo Day 6: Độ nhạy của LiDAR-camera projection với calibration drift
 
 > Thay **mọi** ô có chữ ĐIỀN nằm trong ngoặc vuông bằng nội dung của bạn, xoá luôn cả dấu ngoặc vuông. Lệnh `python tools/check_submission.py` sẽ báo FAIL nếu còn sót bất kỳ chỗ nào.
 
@@ -6,9 +6,9 @@
 - **MSSV:** 2A202602505
 - **Lớp:** K4 Track4
 - **Link repo:** https://github.com/vvstdung89/VanQuocDung-2A202602505-Track4-Day21
-- **Topic:** [ĐIỀN một chữ cái A/B/C/D/E/F] — [ĐIỀN tên topic]
-- **Dataset:** [ĐIỀN một hoặc nhiều trong: data/synthetic, data/kitti_mini, data/nuscenes_mini_subset, log riêng]
-- **Các frame đã dùng:** [ĐIỀN danh sách frame id, ví dụ 000011, 000049 hoặc scene-0103_010]
+- **Topic:** A — LiDAR-camera projection QA
+- **Dataset:** data/kitti_mini (thí nghiệm chính), data/nuscenes_mini_subset (so sánh sensor), data/synthetic (debug, demo theo khoảng cách)
+- **Các frame đã dùng:** toàn bộ 20 frame KITTI mini (000001 … 000061), toàn bộ 80 keyframe nuScenes (scene-0103_000 … 039, scene-1094_000 … 039), synthetic 000000 … 000004
 
 > Hãy viết ngắn: mỗi mục từ 3 đến 8 dòng, ưu tiên số liệu và hình ảnh.
 
@@ -16,7 +16,7 @@
 
 Một câu khẳng định kỹ thuật có thể kiểm chứng. Ví dụ: *"Lệch yaw 1° làm 12% điểm LiDAR rơi ra khỏi vật thể ở 30 m, phát hiện được bằng edge-alignment score với ngưỡng X."*
 
-[ĐIỀN]
+**Claim nháp (CP1):** Trên KITTI mini, lệch yaw 1° làm hơn 10% điểm LiDAR của object (điểm nằm trong 3D box GT) rơi ra ngoài 2D box của chính object đó. Ảnh hưởng tăng theo khoảng cách: vật xa hơn 30 m bị nặng hơn vật gần hơn 15 m. Lệch tịnh tiến 5 cm thì ngược lại, ảnh hưởng chủ yếu vật gần.
 
 ## 2. Evidence
 
