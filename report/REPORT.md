@@ -53,6 +53,14 @@ python -m starter.projection --data-root data/kitti_mini --frame 000011
 python -m starter.projection --data-root data/nuscenes_mini_subset --frame scene-0103_010
 # CP2: ảnh 3 khoảng cách + ảnh so sánh yaw 0°/1°/3°
 python -m src.demo_overlays
+# CP3: sweep drift (22 cấu hình KITTI, 23 cấu hình nuScenes kèm no_ego_motion), khoảng 1 phút mỗi lệnh
+python -m src.calib_sweep --data-root data/kitti_mini --out results/calib_sweep_kitti.csv
+python -m src.calib_sweep --data-root data/nuscenes_mini_subset --out results/calib_sweep_nusc.csv
+# Advanced: phát hiện drift không cần label (nuScenes cần cửa sổ 40 frame)
+python -m src.drift_detect --data-root data/kitti_mini --out results/drift_detect_kitti.csv
+python -m src.drift_detect --data-root data/nuscenes_mini_subset --window 40 --out results/drift_detect_nusc.csv
+# Bảng tóm tắt results/calib_sweep_summary.csv + 3 biểu đồ
+python -m src.plot_results
 ```
 
 ## 6. Khai báo sử dụng AI
