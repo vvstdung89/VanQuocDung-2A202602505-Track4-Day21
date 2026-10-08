@@ -3,6 +3,8 @@
     python -m src.bench_latency
     python -m src.bench_latency --repeats 50 --out results/latency.csv
 
+Ghi ra <out> (p50/p95 theo bước, kèm tên CPU, RAM) và <out>_runs.csv (mỗi dòng một lần chạy).
+
 Các bước đo trên một frame:
   project      chiếu toàn bộ point cloud lên ảnh (velo_to_cam + cam_to_image)
   image_edges  Canny + distance transform của ảnh (mỗi frame một lần)
@@ -14,6 +16,7 @@ from __future__ import annotations
 import argparse
 import os
 import platform
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -24,6 +27,40 @@ import pandas as pd
 from src.calib_metrics import edge_score, image_edge_distance, lidar_depth_edges, score_curves
 from starter.datasets import load_frame
 from starter.projection import project_velo_to_image
+
+
+def cpu_name() -> str:
+    """Tên CPU dễ đọc (Windows / macOS / Linux); trả về platform.processor() nếu không lấy được."""
+    try:
+        if sys.platform == "win32":
+            cmd = ["powershell", "-NoProfile", "-Command", "(Get-CimInstance Win32_Processor).Name"]
+            return subprocess.run(cmd, capture_output=True, text=True, timeout=20).stdout.strip()
+        if sys.platform == "darwin":
+            return subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True).stdout.strip()
+        for line in Path("/proc/cpuinfo").read_text().splitlines():
+            if line.startswith("model name"):
+                return line.split(":", 1)[1].strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return platform.processor()
+
+
+def ram_gb() -> float:
+    """Tổng RAM (GB)."""
+    if sys.platform == "win32":
+        import ctypes
+
+        class MemStatus(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+        m = MemStatus()
+        m.dwLength = ctypes.sizeof(MemStatus)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
+        return round(m.ullTotalPhys / 2**30, 1)
+    return round(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30, 1)
 
 
 def bench(fn, repeats: int) -> np.ndarray:
@@ -43,7 +80,8 @@ def main() -> None:
     args = ap.parse_args()
     repeats = max(20, args.repeats)
 
-    rows = []
+    cpu, ram = cpu_name(), ram_gb()
+    rows, runs = [], []
     for root, fid in [("data/kitti_mini", "000011"), ("data/nuscenes_mini_subset", "scene-0103_010")]:
         fr = load_frame(root, fid)
         pts, calib, img, shape = fr["points"], fr["calib"], fr["image"], fr["image"].shape
@@ -57,17 +95,20 @@ def main() -> None:
         }
         for name, fn in steps.items():
             t = bench(fn, repeats)
+            runs += [{"dataset": Path(root).name, "frame_id": fid, "step": name, "run": i + 1, "ms": round(ms, 3)}
+                     for i, ms in enumerate(t)]
             rows.append({"dataset": Path(root).name, "frame_id": fid, "n_points": len(pts),
                          "image": f"{shape[1]}x{shape[0]}", "step": name, "repeats": repeats,
                          "p50_ms": np.percentile(t, 50), "p95_ms": np.percentile(t, 95), "max_ms": t.max(),
-                         "cpu": platform.processor(), "cpu_count": os.cpu_count(),
+                         "cpu": cpu, "cpu_count": os.cpu_count(), "ram_gb": ram,
                          "python": platform.python_version(), "numpy": np.__version__})
             print(f"{Path(root).name:22s} {name:12s} p50={rows[-1]['p50_ms']:7.2f} ms  p95={rows[-1]['p95_ms']:7.2f} ms")
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     pd.DataFrame(rows).round(3).to_csv(out, index=False)
-    print(f"CPU: {platform.processor()} ({os.cpu_count()} luồng) -> {out}")
+    pd.DataFrame(runs).to_csv(out.with_name(out.stem + "_runs.csv"), index=False)
+    print(f"CPU: {cpu} ({os.cpu_count()} luồng), RAM {ram} GB -> {out}, {out.stem}_runs.csv")
 
 
 if __name__ == "__main__":

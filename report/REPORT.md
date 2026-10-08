@@ -49,7 +49,7 @@ Bảng KITTI, trích từ `results/calib_sweep_summary.csv` (đủ 22 cấu hìn
 
 Ảnh overlay theo 3 khoảng cách trên dữ liệu synthetic (xe ở 8 m, 18 m, 35 m) nằm ở `results/figures/demo_distance_synthetic.png`. Ở frame `000019`, khi yaw 1°: xe 10 m còn 99% điểm trong box, van 35 m còn 76%, xe 60 m còn 32%.
 
-**So sánh 2 dataset (B5): cùng thí nghiệm yaw, nuScenes ít bị ảnh hưởng hơn.**
+**[B5] So sánh KITTI và nuScenes: cùng thí nghiệm yaw, nuScenes ít bị ảnh hưởng hơn.**
 
 | yaw drift | 0° | 0.5° | 1° | 2° | 3° |
 |---|---|---|---|---|---|
@@ -80,13 +80,26 @@ Có 4 nguyên nhân khiến kết quả khác nhau:
 - **Từng frame thì yếu.** Ngay cả trên KITTI, yaw 1° chỉ bị phát hiện ở 20% frame; trên nuScenes thì gần như chỉ bằng mức báo nhầm.
 - **Gộp nhiều frame thì ước lượng lại chính xác** mọi drift xoay ≥ 0.5° trên KITTI. Muốn tái hiện cửa sổ 10 frame trên nuScenes, chạy `--window 10`: 7/8 cửa sổ báo nhầm.
 
-**Latency (B3, `results/latency.csv`).** Đo trên CPU i7-1165G7, bỏ lần chạy đầu, 30 lần, p50/p95:
+**[B1] So sánh 2 metric phát hiện drift trên cùng 20 frame KITTI:** hit rate (cần label) và edge score (không cần label). Cả hai đặt ngưỡng ở mức 5% báo nhầm khi calib đúng. Hit rate lấy từ `results/calib_sweep_kitti.csv` (ngưỡng hit < 93.0%/frame), edge score lấy từ `results/drift_detect_kitti.csv`.
 
-| Bước (KITTI, 119k điểm) | p50 | p95 |
+| Drift | hit rate, từng frame | edge score, từng frame | edge score, gộp 10 frame |
+|---|---|---|---|
+| yaw 0.5° / 1° / 2° | 65 / 95 / 100% | 10 / 20 / 40% | 100% (ước lượng đúng góc) |
+| pitch 0.5° / 1° | 30 / 100% | 20 / 25% | 100% |
+| roll 1° | 15% | 10% | 100% |
+| ty / tz 10 cm | 15 / 15% | 10 / 5% | 0% |
+
+- **Hit rate:** nhạy hơn nhiều khi xét từng frame (yaw 0.5° đã bắt được 65% frame), nhưng **cần 3D box GT**, nên chỉ dùng offline trên dữ liệu đã gán nhãn. Hit rate còn có failure riêng: báo nhầm với người đi bộ (F1).
+- **Edge score:** chạy online được, không cần nhãn, và còn **ước lượng được góc lệch** để hiệu chỉnh lại. Đổi lại, nó cần gộp nhiều frame mới đủ tín hiệu, và mù với drift tịnh tiến (F2).
+- **Không bên nào bắt được tịnh tiến 10 cm:** hit chỉ giảm ≤ 2.5 điểm %.
+
+**[B3] Latency** (`results/latency.csv` cho p50/p95, `results/latency_runs.csv` mỗi dòng một lần chạy). Đo trên CPU Intel Core i7-1165G7 (8 luồng), RAM 16 GB, không dùng GPU. Bỏ lần chạy đầu, đo 30 lần:
+
+| Bước (KITTI 000011, 108k điểm) | p50 | p95 |
 |---|---|---|
-| Chiếu toàn bộ point cloud | 27 ms | 36 ms |
-| Edge score | 49 ms | 66 ms |
-| Dò drift đầy đủ (75 góc) | 214 ms | 247 ms |
+| Chiếu toàn bộ point cloud | 14 ms | 18 ms |
+| Edge score (tách điểm biên + chấm điểm) | 25 ms | 30 ms |
+| Dò drift đầy đủ (3 trục × 25 góc) | 99 ms | 117 ms |
 
 ## 3. Failure case
 
@@ -94,35 +107,39 @@ Có 4 nguyên nhân khiến kết quả khác nhau:
 
 ![failure 1](../results/figures/fail_01_ped_clutter_metric.png)
 
-- **Khi nào:** ở baseline, 10/96 object KITTI có hit < 98%, và **cả 10 đều là Pedestrian**. Thấp nhất là 82% (`000048` #2) và 84% (`000015` #3).
-- **Vì sao:** các điểm đỏ nằm *cùng độ sâu* với người (16.23 m so với 16.21 m), ở độ cao 0.7–1.35 m, lệch ra ngoài mép thân 2–15 cm. Đó là xe đạp dựng sát người, hoặc tay, túi. 3D box GT rộng 0.9 m nên bao luôn phần này, còn 2D box chỉ bó sát phần thân nhìn thấy.
-- **Hậu quả:** nếu đặt ngưỡng QA "hit ≥ 95% mỗi object" thì calib đúng vẫn bị báo drift.
-- **Cách khắc phục:** đặt ngưỡng theo class, hoặc co 3D box (ví dụ còn 80% w/l) khi lấy điểm, hoặc dùng `shift px`/edge score thay cho hit.
+- **Trường hợp:** KITTI, calib gốc (không làm lệch), người đi bộ `000048` #2 (16 m) và `000015` #3 (24 m).
+- **Quan sát:** hit chỉ đạt 82% và 84%. Ở baseline, 10/96 object có hit < 98%, và **cả 10 đều là Pedestrian**. Nếu đặt ngưỡng QA "hit ≥ 95% mỗi object" thì calib đúng vẫn bị báo drift.
+- **Nguyên nhân:** các điểm đỏ nằm *cùng độ sâu* với người (16.23 m so với 16.21 m), ở độ cao 0.7–1.35 m, lệch ra ngoài mép thân 2–15 cm. Đó là xe đạp dựng sát người, hoặc tay, túi. 3D box GT rộng 0.9 m nên bao luôn phần này, còn 2D box chỉ bó sát phần thân nhìn thấy.
+- **Lớp debug:** Metric. Cách đo giả định "điểm trong 3D box = điểm của vật", điều này sai với vật hẹp đứng sát vật khác.
+- **Cách phát hiện khi chạy thật:** đặt ngưỡng theo class, lấy từ phân bố hit lúc calib đúng (phân vị 5% ở KITTI: người đi bộ 83.6%, xe con 100%). Có thể co 3D box còn 80% w/l khi lấy điểm. Theo dõi hit trung bình trên nhiều object thay vì từng object.
 
 **F2: Drift tịnh tiến 10 cm không bị edge-score detector phát hiện (lớp Geometry + Metric)**
 
 ![failure 2](../results/figures/fail_02_trans_10cm_undetected.png)
 
-- **Khi nào:** ty = 10 cm làm điểm của người ở 4.7 m (`000049`) dịch 16 px và hit tụt còn 81%. Thế nhưng cả 2 cửa sổ chỉ tìm ra góc bù yaw −0.25° (< 0.5°), nên không gắn cờ.
-- **Vì sao:** lỗi tịnh tiến gây độ dịch f·t/z, giảm theo khoảng cách (≈ 15 px ở 5 m, ≈ 2.4 px ở 30 m). Trong khi đó, detector chỉ thử các phép xoay, vốn dịch đều ở mọi khoảng cách. Phần lớn điểm biên lại nằm ở 10–40 m, nên không có góc xoay nào "bù" được.
-- **Cách khắc phục:** thêm 3 trục tịnh tiến vào bước dò và đánh trọng số cho điểm biên gần (< 15 m), hoặc kiểm tra tịnh tiến định kỳ bằng target ở xưởng.
+- **Trường hợp:** KITTI, LiDAR lệch ngang ty = 10 cm. Chạy edge-score detector trên 2 cửa sổ 10 frame. Ảnh minh hoạ người đi bộ ở 4.7 m (`000049`).
+- **Quan sát:** điểm của người dịch 16 px và hit tụt còn 81%, thế nhưng cả 2 cửa sổ chỉ tìm ra góc bù yaw −0.25° (< 0.5°), nên không gắn cờ. Với tz = 10 cm cũng vậy (pitch +0.25°).
+- **Nguyên nhân:** lỗi tịnh tiến gây độ dịch f·t/z, giảm theo khoảng cách (≈ 15 px ở 5 m, ≈ 2.4 px ở 30 m). Trong khi đó, detector chỉ thử các phép xoay, vốn dịch đều ở mọi khoảng cách. Phần lớn điểm biên lại nằm ở 10–40 m, nên không có góc xoay nào "bù" được.
+- **Lớp debug:** Geometry (bản chất hình học của lỗi tịnh tiến) kết hợp Metric (score chỉ tìm phép xoay).
+- **Cách phát hiện khi chạy thật:** thêm 3 trục tịnh tiến vào bước dò và đánh trọng số cho điểm biên gần (< 15 m). Ghi log riêng độ lệch pixel trung vị của vật < 10 m. Kiểm tra tịnh tiến định kỳ bằng target ở xưởng.
 
 **F3: Bỏ bù chuyển động khi xe rẽ, projection lệch dù calib đúng (lớp Time)**
 
 ![failure 3](../results/figures/fail_03_nusc_no_ego_motion.png)
 
-- **Khi nào:** ở nuScenes, camera chụp lệch LiDAR khoảng 35.6 ms. Tại `scene-1094_014` (ban đêm), xe đang quay 26°/s, nên trong khoảng lệch đó xe xoay 0.93°. Kết quả tương đương một yaw drift ~1°: điểm lệch 25–27 px khỏi xe.
-- **So sánh:** trung vị trên 80 frame là 9.2 px. Frame đi thẳng (`scene-0103_010`, 8.7 m/s) chỉ xoay 0.04°.
-- **Metric hit không thấy lỗi này** (vẫn 98–100%) vì 2D box của nuScenes rộng. Phải nhìn `shift px` hoặc overlay mới thấy.
-- **Cách khắc phục:** luôn bù ego-motion bằng pose ở từng timestamp. Ghi log |Δt| × yaw rate và bỏ qua frame QA khi yaw rate > 10°/s, để không đổ lỗi nhầm cho calibration.
+- **Trường hợp:** nuScenes `scene-1094_014` (ban đêm), calib đúng, nhưng tắt bù chuyển động (`use_ego_motion=False`, tương đương `--ignore-ego-motion`).
+- **Quan sát:** điểm của 2 xe ở 15–17 m lệch 25–27 px khỏi vị trí đúng. Trung vị trên 80 frame là 9.2 px. Metric hit vẫn 98–100% vì 2D box của nuScenes rộng, nên phải nhìn `shift px` hoặc overlay mới thấy.
+- **Nguyên nhân:** camera chụp lệch LiDAR 35.6 ms, và đúng lúc đó xe đang quay 26°/s, nên xe xoay 0.93°. Kết quả tương đương một yaw drift khoảng 1°. Frame đi thẳng (`scene-0103_010`, 8.7 m/s) chỉ xoay 0.04°, nên lệch ít hơn nhiều.
+- **Lớp debug:** Time.
+- **Cách phát hiện khi chạy thật:** luôn bù ego-motion bằng pose ở từng timestamp. Ghi log |Δt| × yaw rate; khi yaw rate > 10°/s (tức hơn 0.35° trong 35 ms) thì bỏ qua frame đó trong QA calibration, để không đổ lỗi nhầm cho calib.
 
 ## 4. Khuyến nghị nếu triển khai thật
 
 - **Use-case:** fusion LiDAR-camera cho ADAS (AEB, theo dõi xe phía trước). Bracket của sensor lệch 1° sau va chạm nhẹ thì **vật ≥ 30 m bị ảnh hưởng trước**: mất 38 điểm % số điểm trong box, nên ghép object sai ở tốc độ cao tốc. Vật gần thì vẫn trông ổn.
 - **Hệ thống có tự phát hiện được không:** có, với drift xoay ≥ 0.5°, bằng edge score không cần label. Điều kiện là phải gộp đủ frame: 10 frame với LiDAR 64 beam, 40 frame với 32 beam. Drift tịnh tiến và lỗi đồng bộ thời gian cần kiểm tra riêng (F2, F3).
 - **Trade-off:**
-  - Edge score mất 49 ms/frame trên CPU, nên chạy 1–2 Hz ở luồng nền, không đặt trong vòng perception 10 Hz.
-  - Bước dò đầy đủ mất 214 ms, nên chạy trên buffer vài phút một lần.
+  - Edge score mất 25–30 ms/frame trên CPU laptop (p50–p95). Chạy 1–2 Hz ở luồng nền, không đặt trong vòng perception 10 Hz vì sẽ chiếm khoảng 25% ngân sách 100 ms.
+  - Bước dò đầy đủ mất khoảng 100–120 ms mỗi frame, nên chạy trên buffer vài phút một lần.
   - Cửa sổ càng dài thì càng ít báo nhầm, nhưng phát hiện càng chậm.
 - **Chỉ số cần ghi log:**
   - edge score và góc bù tốt nhất theo từng trục (trung bình trượt);
@@ -136,9 +153,13 @@ Có 4 nguyên nhân khiến kết quả khác nhau:
 
 ## 5. Cách chạy lại
 
-Các lệnh tái tạo lại toàn bộ kết quả từ repo sạch. Chạy từ gốc repo sau khi `pip install -r requirements.txt`; tổng thời gian khoảng 6 phút trên laptop. Mọi script trong `src/` đều có `--help` (bonus B4).
+Các lệnh tái tạo lại toàn bộ kết quả từ repo sạch. Chạy từ gốc repo sau khi `pip install -r requirements.txt`; tổng thời gian khoảng 6 phút trên laptop. Đã tự clone repo ra thư mục mới, chạy lại toàn bộ và so md5: cả 12 CSV giống hệt.
+
+**[B4] Tool dùng lại được:** mọi script trong `src/` dùng argparse, mỗi tham số có help, chạy không tham số vẫn ra kết quả. Ví dụ `python -m src.calib_sweep --help` hoặc `python -m src.drift_detect --help`. Có thể dùng cho dataset khác định dạng KITTI/nuScenes qua `--data-root`, `--frames`, `--rot-levels`, `--trans-levels`, `--window`.
 
 ```bash
+# CP2: tự kiểm tra 2 hàm TODO (in "✅ CP2 self-test passed")
+python -m src.test_projection
 # CP0: thống kê dữ liệu
 python -m starter.data_health --data-root data/synthetic
 python -m starter.data_health --data-root data/kitti_mini --out results/data_health_kitti.csv
@@ -159,7 +180,7 @@ python -m src.drift_detect --data-root data/nuscenes_mini_subset --window 40 --o
 python -m src.plot_results
 # CP4: ảnh failure case (đọc results/drift_detect_kitti_windows.csv nên chạy sau drift_detect)
 python -m src.failure_cases
-# B3: latency p50/p95 (số đo phụ thuộc máy)
+# B3: latency p50/p95 + từng lần chạy (số đo phụ thuộc máy và tải lúc đo)
 python -m src.bench_latency
 ```
 
@@ -167,6 +188,7 @@ python -m src.bench_latency
 
 | Công cụ | Dùng cho việc gì | Bạn đã kiểm chứng thế nào |
 |---|---|---|
-| Claude Code (model Claude Opus 5.5) | Đọc đề và lập checklist; viết 2 hàm TODO trong `starter/projection.py` | Test tay theo CP2: điểm (10, 0, 0) cho z_cam = 9.727 và (u, v) = (614.0, 175.0); điểm NaN/Inf/phía sau camera bị lọc. Xem 3 ảnh overlay: điểm khớp xe, người, cột, không có điểm trên trời |
+| Claude Code (model Claude Opus 5.5) | Đọc đề và lập checklist; viết 2 hàm TODO trong `starter/projection.py` | `python -m src.test_projection` pass: điểm (10, 0, 0) cho z_cam = 9.73 và (u, v) = (614, 175); điểm NaN/Inf/phía sau camera/ngoài khung bị lọc. 3 lệnh overlay in đúng inside_image = 3910 / 19946 / 3120. Chạy lại công thức của script mẫu `exp_yaw_sweep` (codelab Phần 05) trên 000008/000011/000049 ra khớp cả 15 giá trị hit_ratio của bảng kỳ vọng |
+| Codelab Day 6 (VLearn) | Khung test `src/test_projection.py` (Phần 04, mục 4.3). Ý tưởng metric "điểm trong 3D box rơi vào 2D box" (Phần 05). Mình không dùng nguyên script mẫu mà viết lại và mở rộng: tách theo khoảng cách, thêm pitch/roll/tịnh tiến, chạy cả nuScenes, thêm detector không cần label | Đối chiếu bảng kỳ vọng như dòng trên trước khi mở rộng |
 | Claude Code | Viết code trong `src/` (metric, sweep, detector, biểu đồ, failure, latency) và chạy thí nghiệm | Chạy lại sweep và detector KITTI, so md5 thấy CSV giống hệt. Kiểm tra `vehicle_axes_in_lidar` ra ma trận đơn vị với KITTI (kết quả KITTI không đổi so với `perturb_extrinsic`). Xem từng ảnh demo/failure bằng mắt |
 | Claude Code | Phân tích failure case và soạn nháp báo cáo | F1: in toạ độ 3D của điểm đỏ và điểm xanh (cùng độ sâu, cao 0.7–1.35 m) trước khi kết luận nguyên nhân. F3: tính góc quay của xe giữa 2 timestamp từ `ego_pose` (0.93°, 26°/s). Mọi số trong báo cáo lấy từ CSV trong `results/` |

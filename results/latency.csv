@@ -1,9 +1,9 @@
-dataset,frame_id,n_points,image,step,repeats,p50_ms,p95_ms,max_ms,cpu,cpu_count,python,numpy
-kitti_mini,000011,108004,1242x375,project,30,27.213,35.86,36.796,"Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",8,3.10.11,2.2.6
-kitti_mini,000011,108004,1242x375,image_edges,30,12.287,14.986,15.742,"Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",8,3.10.11,2.2.6
-kitti_mini,000011,108004,1242x375,edge_score,30,48.722,66.044,69.772,"Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",8,3.10.11,2.2.6
-kitti_mini,000011,108004,1242x375,drift_search,30,213.993,247.308,277.21,"Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",8,3.10.11,2.2.6
-nuscenes_mini_subset,scene-0103_010,34720,1600x900,project,30,8.826,13.731,14.858,"Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",8,3.10.11,2.2.6
-nuscenes_mini_subset,scene-0103_010,34720,1600x900,image_edges,30,42.583,53.348,73.486,"Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",8,3.10.11,2.2.6
-nuscenes_mini_subset,scene-0103_010,34720,1600x900,edge_score,30,28.984,35.636,36.526,"Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",8,3.10.11,2.2.6
-nuscenes_mini_subset,scene-0103_010,34720,1600x900,drift_search,30,207.282,266.121,268.1,"Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",8,3.10.11,2.2.6
+dataset,frame_id,n_points,image,step,repeats,p50_ms,p95_ms,max_ms,cpu,cpu_count,ram_gb,python,numpy
+kitti_mini,000011,108004,1242x375,project,30,14.144,18.175,20.094,11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz,8,15.7,3.10.11,2.2.6
+kitti_mini,000011,108004,1242x375,image_edges,30,6.282,7.067,9.898,11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz,8,15.7,3.10.11,2.2.6
+kitti_mini,000011,108004,1242x375,edge_score,30,24.641,30.361,32.367,11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz,8,15.7,3.10.11,2.2.6
+kitti_mini,000011,108004,1242x375,drift_search,30,99.376,117.438,122.648,11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz,8,15.7,3.10.11,2.2.6
+nuscenes_mini_subset,scene-0103_010,34720,1600x900,project,30,4.39,5.704,5.818,11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz,8,15.7,3.10.11,2.2.6
+nuscenes_mini_subset,scene-0103_010,34720,1600x900,image_edges,30,16.349,18.14,18.883,11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz,8,15.7,3.10.11,2.2.6
+nuscenes_mini_subset,scene-0103_010,34720,1600x900,edge_score,30,9.869,11.574,12.215,11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz,8,15.7,3.10.11,2.2.6
+nuscenes_mini_subset,scene-0103_010,34720,1600x900,drift_search,30,80.389,87.62,87.918,11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz,8,15.7,3.10.11,2.2.6
